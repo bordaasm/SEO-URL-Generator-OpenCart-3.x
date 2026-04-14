@@ -1,2 +1,93 @@
-# SEO-URL-Generator-OpenCart-3.x
-Simple SEO url Generator for OpenCart 3.x
+# OpenCart SEO URL Generator
+
+PHP-скрипт для автоматической генерации ЧПУ (человекопонятных URL) для категорий и товаров в OpenCart 3.x.
+
+Транслитерирует русские и украинские названия в латинские slug-и и записывает их в таблицу `oc_seo_url`.
+
+## Требования
+
+- OpenCart 3.x
+- PHP 7.1+
+- Включённый параметр "Включить ЧПУ" в админке (Система → Настройки → Сервер)
+- Настроенный `.htaccess` с `mod_rewrite`
+
+## Установка
+
+1. Скопировать `seo_generate.php` в **корень сайта** (рядом с `index.php` и `config.php`)
+2. Открыть в браузере
+
+## Использование
+
+### 1. Превью — ничего не меняет
+
+```
+https://your-site.com/seo_generate.php?mode=dry
+```
+
+Показывает таблицу со всеми категориями и товарами, какие slug-и будут присвоены.
+
+### 2. Применить
+
+```
+https://your-site.com/seo_generate.php?mode=run
+```
+
+Вставляет недостающие slug-и в `oc_seo_url`. Уже существующие записи **не трогает**.
+
+### 3. Сбросить все SEO URL категорий и товаров
+
+```
+https://your-site.com/seo_generate.php?mode=clear
+```
+
+Удаляет все записи `category_id=*` и `product_id=*` из `oc_seo_url` для дефолтного магазина и языка.  
+После этого можно снова запустить `?mode=run`.
+
+### 4. После завершения — удалить файл
+
+```bash
+rm seo_generate.php
+```
+
+> **Важно:** скрипт не требует авторизации и доступен публично. Не оставляй его на сервере после использования.
+
+## Как работает
+
+- Читает параметры подключения к БД из `config.php` OpenCart — правки не нужны
+- Автоматически определяет первый активный язык из таблицы `oc_language`
+- Транслитерирует кириллицу в латиницу (русский + украинский)
+- Генерирует slug: строчные буквы, цифры, дефис
+- При совпадении slug-ов добавляет суффикс: `-2`, `-3` и т.д.
+- Использует `INSERT IGNORE` — повторный запуск безопасен
+
+## Пример результата
+
+| До | После |
+|---|---|
+| `/index.php?route=product/category&path=25` | `/mebel/` |
+| `/index.php?route=product/product&product_id=552` | `/mebel/divan-uglovoy-art-128` |
+
+## Ограничения
+
+| Условие | Поведение |
+|---|---|
+| Несколько магазинов (multi-store) | Обрабатывает только `store_id = 0`. Поменяй переменную `$storeId` в коде |
+| Несколько языков | Берёт только первый активный язык. Для мультиязычности нужна доработка |
+| OpenCart 2.x | Не тестировалось. Структура `oc_seo_url` может отличаться |
+
+## .htaccess
+
+В корне сайта должен быть настроен `mod_rewrite`. Минимальная конфигурация:
+
+```apache
+<IfModule mod_rewrite.c>
+    Options +FollowSymLinks
+    RewriteEngine On
+    RewriteBase /
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    RewriteRule ^(.*)$ index.php?_route_=$1 [L,QSA]
+</IfModule>
+```
